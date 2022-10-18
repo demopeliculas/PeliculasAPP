@@ -1,0 +1,202 @@
+﻿@page "/peliculas"
+@using DemoPeliculas.Shared.Models
+@inject HttpClient Http
+@inject NavigationManager Navigation
+
+<div class="top-row px-4" style="background-image: linear-gradient(180deg, #084298 0%, #0d6efd 70%); height: 50px; text-align: right; padding: 10px; margin-bottom: 50px;">
+    <strong>
+        <a style="color: #fff; margin-right: 30px; text-decoration: none;" href="peliculas">Películas</a>
+        <a style="color: #fff; margin-right: 30px; text-decoration: none;" href="listaReproduccion">Lista de reproducción</a>
+        <a style="color: #fff; cursor: pointer;" @onclick="CerrarSesion">Cerrar sesión</a>
+    </strong>
+</div>
+
+
+<h3>Listado de películas disponibles</h3>
+
+@if (_peliculas == null)
+{
+    <p><em>Cargando...</em></p>
+}
+else
+{
+    <div class="row" style="margin-bottom: 20px;">
+        <div class="col-6">
+            <p><strong>Buscar por título</strong></p>
+            <input type="text" class="form-control" @oninput="(e) => {BuscarPelicula(e.Value.ToString());}"/>
+        </div>
+
+        <div class="col-2" style="float: right;">
+            <p><strong>Ordenar por</strong></p>
+            <button class="btn btn-sm btn-secondary" @onclick="OrdenarTitulo">Título</button>
+            <button class="btn btn-sm btn-secondary" @onclick="OrdenadrLanzamiento">Lanzamiento</button>
+        </div>
+
+        <div class="col-2" style="float: right;">
+            <p><strong>Filtrar por</strong></p>
+            <button style="margin-right: 4px;" class="btn btn-sm btn-secondary" @onclick="FiltrarMesActual">Mes actual</button>
+            @if (_usuarioVerificado != 2)
+            {
+                <button class="btn btn-sm btn-secondary" @onclick="FiltrarInfantil">Infantil</button>
+                <button class="btn btn-sm btn-secondary" @onclick="FiltrarAulto">Adulto</button>
+            }
+        </div>
+
+        <div class="col-2" style="float: right;">
+            <p><strong>Restaurar orden y filtros</strong></p>
+            <button class="btn btn-sm btn-secondary" @onclick="RestaurarOrdenFiltro">Restaurar</button>
+        </div>
+
+        <div class="col-12" style="float: left; margin-top: 30px;">
+            <h3><strong>Películas encontradas:</strong> @_peliculas.Count()</h3>
+        </div>
+
+    </div>
+
+
+    <table class="table">
+        <thead>
+            <tr>
+                <th></th>
+                <th>Título</th>
+                <th>Puntuación</th>
+                <th>Lanzamiento</th>
+                <th>Descripción</th>
+                <th>Duración</th>
+                <th>Lista Reproducción</th>
+            </tr>
+        </thead>
+        <tbody>
+
+            @foreach (var pelicula in _peliculas)
+            {
+                <tr>
+                    <td><img src="/img/peliculas/@pelicula.NombreImagen" width="150"/></td>
+                    <td>@pelicula.Titulo</td>
+                    <td>
+                        <div style="display: -webkit-inline-box;">
+                            <p>Puntuación: </p>
+                            @{
+                                var puntuacionTotal = 0.0;
+                                if (_puntuaciones.Count() != 0 && _puntuaciones.Where(x => x.IdPelicula == pelicula.Id).ToList().Count() != 0)
+                                { puntuacionTotal = Convert.ToDouble(_puntuaciones.Where(x => x.IdPelicula == pelicula.Id).Sum(x => x.Calificacion)) / Convert.ToDouble(_puntuaciones.Where(x => x.IdPelicula == pelicula.Id).Count()); }
+                            }
+                            @puntuacionTotal
+
+                        </div>
+                        <div style="display: -webkit-inline-box;">
+                            @for (int index = 0; index < 5; index++)
+                            {
+                                var calificacion = index + 1;
+                                <div @onclick="(() => AñadirPuntuacion(calificacion, pelicula.Id))" style="cursor: pointer;">
+                                    <img src="/img/estrella.png" width="20"/>
+                                </div>
+                            }
+                        </div>
+                    </td>
+                    <td>@pelicula.FechaEstreno.ToShortDateString()</td>
+                    <td>@pelicula.Descripcion</td>
+                    <td>@pelicula.Duracion</td>
+                    <td>
+                        <button style="color: #fff;" class="btn btn-info" @onclick="(() => AñadirReproduccion(pelicula.Id))">Añadir</button>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+@code {
+
+    private List<Pelicula> _peliculas;
+    private List<Pelicula> _restaurarPeliculas;
+    private List<Puntuacion> _puntuaciones;
+    private int _usuarioVerificado;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _usuarioVerificado = await Http.GetFromJsonAsync<int>("/api/Usuarios");
+        if (_usuarioVerificado == 0)
+        {
+            Navigation.NavigateTo($"/loginUsuarios");
+        }
+        else
+        {
+            _puntuaciones = await Http.GetFromJsonAsync<List<Puntuacion>>("/api/Puntuaciones");
+            _peliculas = await Http.GetFromJsonAsync<List<Pelicula>>("/api/Peliculas");
+            _restaurarPeliculas = _peliculas;
+        }
+    }
+
+    private async Task AñadirReproduccion(int idPelicula)
+    {
+        await Http.PostAsync($"/api/ListaReproducciones/{idPelicula}", null);
+    }
+
+    private async Task AñadirPuntuacion(int calificacion, int idPelicula)
+    {
+        var puntuacion = new Puntuacion()
+        {
+            Calificacion = calificacion,
+            IdPelicula = idPelicula
+        };
+
+        await Http.PostAsJsonAsync<Puntuacion>($"/api/Puntuaciones/", puntuacion);
+        _puntuaciones = await Http.GetFromJsonAsync<List<Puntuacion>>("/api/Puntuaciones");
+        StateHasChanged();
+    }
+
+    private void OrdenarTitulo()
+    {
+        _peliculas = _peliculas.OrderBy(x => x.Titulo).ToList();
+        StateHasChanged();
+    }
+
+    private void OrdenadrLanzamiento()
+    {
+        _peliculas = _peliculas.OrderBy(x => x.FechaEstreno).ToList();
+        StateHasChanged();
+    }
+
+    private void FiltrarInfantil()
+    {
+        _peliculas = _restaurarPeliculas;
+        _peliculas = _peliculas.Where(x => x.EsInfantil == true).ToList();
+        StateHasChanged();
+    }
+
+    private void FiltrarAulto()
+    {
+        _peliculas = _restaurarPeliculas;
+        _peliculas = _peliculas.Where(x => x.EsInfantil == false).ToList();
+        StateHasChanged();
+    }
+
+    private void FiltrarMesActual()
+    {
+        _peliculas = _restaurarPeliculas;
+        _peliculas = _peliculas.Where(x => x.FechaEstreno.Month == DateTime.Now.Month).ToList();
+        StateHasChanged();
+    }
+
+    private void BuscarPelicula(string titulo)
+    {
+        _peliculas = _restaurarPeliculas;
+        titulo = titulo.ToUpper().Replace("Á", "A").Replace("É", "E").Replace("Í", "I").Replace("Ó", "O").Replace("Ú", "U");
+        _peliculas = _peliculas.Where(x =>  x.Titulo.ToUpper().Replace("Á", "A").Replace("É", "E").Replace("Í", "I").Replace("Ó", "O").Replace("Ú", "U").Contains(titulo)).ToList();
+        StateHasChanged();
+    }
+
+    private void RestaurarOrdenFiltro()
+    {
+        _peliculas = _restaurarPeliculas;
+        StateHasChanged();
+    }
+
+    private async Task CerrarSesion()
+    {
+        await Http.PostAsync($"/api/Usuarios", null);
+
+        Navigation.NavigateTo($"/loginUsuarios");
+    }
+
+}

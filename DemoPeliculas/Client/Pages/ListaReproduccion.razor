@@ -1,0 +1,105 @@
+﻿@page "/listaReproduccion"
+@using DemoPeliculas.Shared.Models
+@inject HttpClient Http
+@inject NavigationManager Navigation
+
+<div class="top-row px-4" style="background-image: linear-gradient(180deg, #084298 0%, #0d6efd 70%); height: 50px; text-align: right; padding: 10px; margin-bottom: 50px;">
+    <strong>
+        <a style="color: #fff; margin-right: 30px; text-decoration: none;" href="peliculas">Películas</a>
+        <a style="color: #fff; margin-right: 30px; text-decoration: none;" href="listaReproduccion">Lista de reproducción</a>
+        <a style="color: #fff; cursor: pointer;" @onclick="CerrarSesion">Cerrar sesión</a>
+    </strong>
+</div>
+
+
+
+<h3>Lista de reproducción</h3>
+
+@if (_peliculas == null)
+{
+    <p><em>Cargando...</em></p>
+}
+else
+{
+    <div class="row">
+            
+    <div class="col-12" style="text-align: center; height: 500px; background-color: lightgrey">
+        @if (_peliculaSeleccionada != null)
+        {
+                <video width="800" controls src="/videos/peliculas/@_peliculaSeleccionada" autoplay></video>
+        }
+        else if (_peliculaSeleccionada == string.Empty)
+        {
+                <p style="margin-top: 200px; background-color: lightgrey">Error, esta película no tiene video disponible...</p>
+        }
+        else
+        {
+            <p style="margin-top: 200px;">Seleccione una película para ver...</p>
+        }
+        </div>
+
+    <div class="col-12" style="margin-bottom: 20px;">
+        <div style="float: left; margin-right: 20px;">
+            <h3><strong>Películas para reproducir:</strong> @_peliculas.Count()</h3>
+        </div>
+    </div>
+
+    @foreach (var pelicula in _peliculas)
+    {
+        <div class="row" style="margin-bottom: 50px;">
+            <div class="col-4">
+                <img src="/img/peliculas/@pelicula.NombreImagen" width="150"/>
+                <br/>
+                <button class="btn btn-sm btn-primary" @onclick="(() => VerPelicula(pelicula.NombreVideo))" style="margin-top: 20px;">Ver película</button>
+                <button class="btn btn-sm btn-danger" @onclick="(() => QuitarPelicula(pelicula.Id))" style="margin-top: 20px;">Quitar película</button>
+            </div>
+            <div class="col-8">
+                <p>@pelicula.Titulo</p>
+                <p>@pelicula.Descripcion</p>
+                <p>Lanzamiento: @pelicula.FechaEstreno Duración: @pelicula.Duracion</p>
+            </div>
+        </div>
+    }
+
+    </div>
+}
+@code {
+
+    private List<Pelicula> _peliculas;
+    private string _peliculaSeleccionada;
+    private int _usuarioVerificado;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _usuarioVerificado = await Http.GetFromJsonAsync<int>("/api/Usuarios");
+        if (_usuarioVerificado == 0)
+        {
+            Navigation.NavigateTo($"/loginUsuarios");
+        }
+        else
+        {
+            _peliculas = await Http.GetFromJsonAsync<List<Pelicula>>("/api/ListaReproducciones");
+        }
+    }
+
+    private void VerPelicula(string peliculaSeleccionada)
+    {
+        _peliculaSeleccionada = peliculaSeleccionada;
+        StateHasChanged();
+    }
+
+        private async Task QuitarPelicula(int idPelicula)
+    {
+        await Http.DeleteAsync($"/api/ListaReproducciones/{idPelicula}");
+        _peliculas = await Http.GetFromJsonAsync<List<Pelicula>>("/api/ListaReproducciones");
+        StateHasChanged();
+    }
+
+    private async Task CerrarSesion()
+    {
+        await Http.PostAsync($"/api/Usuarios", null);
+
+        Navigation.NavigateTo($"/loginUsuarios");
+    }
+
+}

@@ -1,0 +1,32 @@
+﻿@page "/"
+@page "/loginUsuarios"
+@using DemoPeliculas.Shared.Models
+@inject HttpClient Http
+@inject NavigationManager Navigation
+
+<div class="row">
+    <div class="col-12" style="text-align: center; text-align: center; margin-top: 100px; margin-bottom: 150px;">
+        <h3>Iniciar sesión</h3>
+    </div>
+
+    <div class="row" style="text-align: center;">
+        <div class="col-6" @onclick="(() => SeleccionarUsuario(1.ToString()))">
+            <img width="150" src="/img/usuarios/Adulto.png" style="cursor: pointer;"/>
+            <p>Adulto</p>
+        </div>
+        <div class="col-6" @onclick="(() => SeleccionarUsuario(2.ToString()))">
+            <img width="150" src="/img/usuarios/Niño.png" style="cursor: pointer;"/>
+            <p>Niño</p>
+        </div>
+
+    </div>
+</div>
+
+@code {
+    private async Task SeleccionarUsuario(string idUsuario)
+    {
+        await Http.PostAsync($"/api/Usuarios/{idUsuario}", null);
+        Navigation.NavigateTo($"/peliculas");
+    }
+
+}
